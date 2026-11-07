@@ -1,2 +1,4 @@
-// Public values only (safe in the browser). Never put the service-role key here.
-window.IGE_CONFIG={SUPABASE_URL:"",SUPABASE_ANON_KEY:""};
+window.IGE_CONFIG = {
+  SUPABASE_URL: "https://hwykacvdywwuoduksqlp.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_ljnEJg6tazzc_YstS7DjFg_PP1t5Tad"
+};
