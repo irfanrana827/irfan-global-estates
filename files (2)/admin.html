@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Admin | Irfan Global Estates &amp; Developers</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#101820;--gold:#C9A76A;--line:#dfe3e7;--f1:'Manrope',system-ui,sans-serif}*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 'DM Sans',system-ui,sans-serif;background:#F4F5F6;color:#101820}
+header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}header b{font:800 15px var(--f1);letter-spacing:.12em}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}nav button{background:none;border:1px solid transparent;color:#fff;font:600 13px var(--f1);padding:8px 14px;border-radius:8px;cursor:pointer}nav button.on{border-color:var(--gold);color:var(--gold)}
+main{max-width:1180px;margin:0 auto;padding:24px 16px}.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
+h2{font:700 22px var(--f1);margin:0 0 14px}h3{font:700 16px var(--f1);margin:0 0 10px}.stats{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.stat b{display:block;font:800 30px var(--f1)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}.tw{overflow-x:auto}
+input,select,textarea{width:100%;padding:10px;border:1px solid #c9d0d6;border-radius:8px;font:inherit;background:#fff}label{font:600 12px var(--f1);display:block;margin-bottom:4px}
+.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.full{grid-column:1/-1}
+button.b{background:var(--gold);color:var(--navy);border:0;border-radius:8px;padding:10px 16px;font:700 13px var(--f1);cursor:pointer}button.b.s{background:#fff;border:1px solid #c9d0d6;color:var(--navy)}button.b.d{background:#b42318;color:#fff}button.b:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.pill{font:600 11px var(--f1);padding:3px 9px;border-radius:99px;background:#eceff1}.pill.ok{background:#d9f2e3}.msg{padding:10px 12px;border-radius:8px;background:#fdecea;color:#7a1c14;margin-bottom:12px}.msg.ok{background:#e6f4ea;color:#14532d}
+.media{display:flex;gap:10px;flex-wrap:wrap}.media div{width:110px;font-size:11px}.media img,.media video{width:110px;height:80px;object-fit:cover;border-radius:6px;display:block}
+#login{max-width:380px;margin:12vh auto}[hidden]{display:none!important}
+</style></head><body>
+<div id="login" class="card"><h2>Admin sign in</h2><div id="lmsg"></div><label for="em">Email</label><input id="em" type="email" autocomplete="username"><label for="pw" style="margin-top:10px">Password</label><input id="pw" type="password" autocomplete="current-password"><p><button class="b" id="go">Sign in</button></p></div>
+<div id="app" hidden><header><b>IRFAN GLOBAL · ADMIN</b><nav id="nav"><button data-t="ov" class="on">Overview</button><button data-t="pr">Properties</button><button data-t="en">Enquiries</button><button data-t="lo">Locations</button><button id="out">Sign out</button></nav></header><main id="main"></main></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const C=window.IGE_CONFIG||{},$=s=>document.querySelector(s),B='property-media',ST=['new','contacted','in_progress','converted','closed'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const TYPES=['Residential Plot','Commercial Plot','House','Luxury Villa','Apartment','Farmhouse','Shop','Office','Commercial Building','Agricultural Land','Industrial Property','Warehouse'];
+const LV=['city','society','phase','sector','block'];let sb,LOC=[];
+const msg=(t,ok)=>`<div class="msg ${ok?'ok':''}">${esc(t)}</div>`;
+if(!C.SUPABASE_URL||!C.SUPABASE_ANON_KEY){$('#lmsg').innerHTML=msg('Backend not configured. Add your Supabase URL and anon key to config.js.')}else{sb=supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);boot()}
+async function boot(){const{data:{session}}=await sb.auth.getSession();if(session)await enter(session.user)}
+async function enter(u){const{data}=await sb.from('profiles').select('role').eq('id',u.id).maybeSingle();
+ if(!data||data.role!=='admin'){await sb.auth.signOut();$('#lmsg').innerHTML=msg('This account is not authorised as an administrator.');return}
+ $('#login').hidden=true;$('#app').hidden=false;await loadLoc();show('ov')}
+$('#go').onclick=async()=>{$('#lmsg').innerHTML='';if(!sb)return;const{data,error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
+ if(error){$('#lmsg').innerHTML=msg('Sign in failed. Check your email and password.');return}await enter(data.user)};
+$('#out').onclick=async()=>{await sb.auth.signOut();location.reload()};
+$('#nav').onclick=e=>{const t=e.target.dataset.t;if(t)show(t)};
+function show(t){document.querySelectorAll('#nav [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));({ov,pr:props,en:enqs,lo:locs})[t]()}
+async function loadLoc(){const{data}=await sb.from('locations').select('*').order('name');LOC=data||[]}
+const kids=(p,t)=>LOC.filter(l=>l.type===t&&(p==null||l.parent_id==p));
+const lname=id=>(LOC.find(l=>l.id==id)||{}).name||'';
+async function cnt(t,f){let q=sb.from(t).select('*',{count:'exact',head:true});if(f)q=f(q);const{count,error}=await q;return error?'?':count}
+async function ov(){const M=$('#main');M.innerHTML='<p>Loading…</p>';
+ const[a,b,c,d,e,f]=await Promise.all([cnt('properties'),cnt('properties',q=>q.eq('is_published',true)),cnt('properties',q=>q.eq('is_published',false)),cnt('properties',q=>q.eq('is_featured',true)),cnt('enquiries'),cnt('enquiries',q=>q.eq('status','new'))]);
+ const[re,rp]=await Promise.all([sb.from('enquiries').select('id,reference,type,name,status,created_at').order('created_at',{ascending:false}).limit(6),sb.from('properties').select('id,code,title,is_published,created_at').order('created_at',{ascending:false}).limit(6)]);
+ const S=(n,l)=>`<div class="card stat"><b>${n}</b>${l}</div>`;
+ M.innerHTML=`<h2>Overview</h2><div class="stats">${S(a,'Total properties')}${S(b,'Published')}${S(c,'Unpublished')}${S(d,'Featured')}${S(e,'Total enquiries')}${S(f,'New enquiries')}</div>
+ <div class="card"><h3>Recent enquiries</h3>${(re.data||[]).length?`<div class="tw"><table>${re.data.map(x=>`<tr><td>${esc(x.reference)}</td><td>${esc(x.type)}</td><td>${esc(x.name)}</td><td><span class="pill">${esc(x.status)}</span></td><td>${new Date(x.created_at).toLocaleString()}</td></tr>`).join('')}</table></div>`:'<p>No enquiries yet.</p>'}</div>
+ <div class="card"><h3>Recently added properties</h3>${(rp.data||[]).length?`<div class="tw"><table>${rp.data.map(x=>`<tr><td>${esc(x.code)}</td><td>${esc(x.title)}</td><td><span class="pill ${x.is_published?'ok':''}">${x.is_published?'Published':'Draft'}</span></td></tr>`).join('')}</table></div>`:'<p>No properties yet. Add one under Properties.</p>'}</div>`}
+async function props(){const M=$('#main');const{data,error}=await sb.from('properties').select('id,code,title,price_pkr,is_published,is_featured,availability').order('created_at',{ascending:false}).limit(200);
+ M.innerHTML=`<div class="row" style="justify-content:space-between"><h2>Properties</h2><button class="b" id="np">Add property</button></div>${error?msg(error.message):''}<div class="card tw">${(data||[]).length?`<table><tr><th>ID</th><th>Title</th><th>PKR</th><th>Status</th><th></th></tr>${data.map(p=>`<tr><td>${esc(p.code)}</td><td>${esc(p.title)}</td><td>${Number(p.price_pkr).toLocaleString()}</td><td><span class="pill ${p.is_published?'ok':''}">${p.is_published?'Published':'Draft'}</span> ${p.is_featured?'<span class="pill ok">Featured</span>':''} <span class="pill">${esc(p.availability)}</span></td><td><div class="row"><button class="b s" data-a="e" data-i="${p.id}">Edit</button><button class="b s" data-a="p" data-i="${p.id}" data-v="${p.is_published}">${p.is_published?'Unpublish':'Publish'}</button><button class="b s" data-a="f" data-i="${p.id}" data-v="${p.is_featured}">${p.is_featured?'Unfeature':'Feature'}</button><button class="b d" data-a="d" data-i="${p.id}">Delete</button></div></td></tr>`).join('')}</table>`:'<p>No properties yet.</p>'}</div>`;
+ $('#np').onclick=()=>pform();
+ M.querySelector('table')&&(M.querySelector('table').onclick=async e=>{const b=e.target.closest('button');if(!b)return;const id=b.dataset.i,a=b.dataset.a;
+  if(a==='e')return pform(id);
+  if(a==='p'||a==='f'){await sb.from('properties').update(a==='p'?{is_published:b.dataset.v!=='true'}:{is_featured:b.dataset.v!=='true'}).eq('id',id);return props()}
+  if(a==='d'&&confirm('Delete this property and its media permanently?')){const{data:m}=await sb.from('property_media').select('path').eq('property_id',id);if(m&&m.length)await sb.storage.from(B).remove(m.map(x=>x.path));await sb.from('properties').delete().eq('id',id);props()}})}
+const num=v=>v===''||v==null?null:Number(v);
+async function pform(id){const M=$('#main');let p={is_published:false,is_featured:false,availability:'available',verification_status:'unverified',category:'residential',purpose:'sale',size_unit:'marla',amenities:[],property_media:[]};
+ if(id){const{data}=await sb.from('properties').select('*,property_media(*)').eq('id',id).single();p=data}
+ const F=(k,l,t='text')=>`<div><label for="f-${k}">${l}</label><input id="f-${k}" type="${t}" value="${esc(p[k])}"></div>`;
+ const SL=(k,l,o)=>`<div><label for="f-${k}">${l}</label><select id="f-${k}">${o.map(x=>`<option ${x===p[k]?'selected':''}>${x}</option>`).join('')}</select></div>`;
+ const loc=l=>`<div><label for="l-${l}">${l[0].toUpperCase()+l.slice(1)}</label><select id="l-${l}"></select></div>`;
+ M.innerHTML=`<h2>${id?'Edit':'Add'} property</h2><div id="pm"></div><div class="card g">${F('title','Title')}${SL('category','Category',['residential','commercial'])}${SL('property_type','Property type',TYPES)}${SL('purpose','Sale or rent',['sale','rent'])}${F('price_pkr','Price (PKR)','number')}${F('size_value','Size','number')}${SL('size_unit','Size unit',['marla','kanal','sq ft','sq yd','acre'])}${F('bedrooms','Bedrooms','number')}${F('bathrooms','Bathrooms','number')}
+ ${LV.map(loc).join('')}${F('address','Address / plot number')}${SL('availability','Availability',['available','under_offer','sold','rented'])}${SL('verification_status','Verification status',['unverified','verified'])}
+ <div class="full"><label for="f-amenities">Amenities (comma separated)</label><input id="f-amenities" value="${esc((p.amenities||[]).join(', '))}"></div><div class="full"><label for="f-description">Description</label><textarea id="f-description" rows="6">${esc(p.description)}</textarea></div>
+ <div><label><input type="checkbox" id="f-is_published" ${p.is_published?'checked':''} style="width:auto"> Published</label></div><div><label><input type="checkbox" id="f-is_featured" ${p.is_featured?'checked':''} style="width:auto"> Featured</label></div>
+ <div class="full"><label for="f-img">Add images (JPG, PNG, WebP, max 5 MB each)</label><input id="f-img" type="file" accept="image/jpeg,image/png,image/webp" multiple></div><div class="full"><label for="f-vid">Add video (MP4, max 50 MB)</label><input id="f-vid" type="file" accept="video/mp4"></div>
+ <div class="full media" id="pmedia"></div><div class="full row"><button class="b" id="sv">Save property</button><button class="b s" id="cx">Cancel</button></div></div>`;
+ const sel={};const fill=()=>{let par=null;LV.forEach(l=>{const s=$('#l-'+l),cur=sel[l]??p[l+'_id']??'';const o=kids(par,l);s.innerHTML='<option value="">None</option>'+o.map(x=>`<option value="${x.id}" ${x.id==cur?'selected':''}>${esc(x.name)}</option>`).join('');sel[l]=s.value;if(s.value)par=s.value;s.onchange=()=>{sel[l]=s.value;LV.slice(LV.indexOf(l)+1).forEach(k=>sel[k]='');fill()}})};fill();
+ const media=()=>{$('#pmedia').innerHTML=(p.property_media||[]).map(m=>{const u=sb.storage.from(B).getPublicUrl(m.path).data.publicUrl;return `<div>${m.kind==='image'?`<img src="${u}" alt="">`:`<video src="${u}"></video>`}<button class="b d" data-m="${m.id}" data-p="${esc(m.path)}" type="button">Remove</button></div>`}).join('')};media();
+ $('#pmedia').onclick=async e=>{const b=e.target.closest('button');if(!b)return;await sb.storage.from(B).remove([b.dataset.p]);await sb.from('property_media').delete().eq('id',b.dataset.m);p.property_media=p.property_media.filter(m=>m.id!==b.dataset.m);media()};
+ $('#cx').onclick=props;
+ $('#sv').onclick=async()=>{const g=k=>$('#f-'+k).value.trim(),btn=$('#sv'),pm=$('#pm');pm.innerHTML='';
+  if(g('title').length<3||g('price_pkr')===''||Number(g('price_pkr'))<0){pm.innerHTML=msg('Enter a title (3+ characters) and a valid price.');return}
+  const imgs=[...$('#f-img').files],vid=$('#f-vid').files[0];
+  for(const f of imgs)if(!/^image\/(jpeg|png|webp)$/.test(f.type)||f.size>5*1048576){pm.innerHTML=msg(`${f.name}: images must be JPG, PNG or WebP under 5 MB.`);return}
+  if(vid&&(vid.type!=='video/mp4'||vid.size>50*1048576)){pm.innerHTML=msg('Video must be MP4 under 50 MB.');return}
+  const row={title:g('title'),category:g('category'),property_type:g('property_type'),purpose:g('purpose'),price_pkr:Number(g('price_pkr')),size_value:num(g('size_value')),size_unit:g('size_unit'),bedrooms:num(g('bedrooms')),bathrooms:num(g('bathrooms')),address:g('address')||null,availability:g('availability'),verification_status:g('verification_status'),description:g('description')||null,amenities:g('amenities').split(',').map(x=>x.trim()).filter(Boolean),is_published:$('#f-is_published').checked,is_featured:$('#f-is_featured').checked};
+  LV.forEach(l=>row[l+'_id']=sel[l]?Number(sel[l]):null);btn.disabled=true;btn.textContent='Saving…';
+  let pid=id,r;if(id)r=await sb.from('properties').update(row).eq('id',id).select('id').single();else{const{data:{user}}=await sb.auth.getUser();r=await sb.from('properties').insert({...row,created_by:user.id}).select('id').single()}
+  if(r.error){pm.innerHTML=msg(r.error.message);btn.disabled=false;btn.textContent='Save property';return}pid=r.data.id;
+  let n=(p.property_media||[]).length;const up=async(f,kind)=>{const path=`${pid}/${crypto.randomUUID()}.${f.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'')}`;const u=await sb.storage.from(B).upload(path,f,{contentType:f.type});if(u.error)throw u.error;const m=await sb.from('property_media').insert({property_id:pid,kind,path,sort:n++});if(m.error)throw m.error};
+  try{for(const f of imgs)await up(f,'image');if(vid)await up(vid,'video')}catch(err){pm.innerHTML=msg('Property saved, but a file upload failed: '+err.message);btn.disabled=false;btn.textContent='Save property';return}
+  props()}}
+async function enqs(){const M=$('#main');M.innerHTML=`<h2>Enquiries</h2><div class="card g"><div><label for="eq">Search</label><input id="eq" placeholder="Name, phone, email or reference"></div><div><label for="es">Status</label><select id="es"><option value="">All</option>${ST.map(s=>`<option>${s}</option>`).join('')}</select></div><div><label for="et">Type</label><select id="et"><option value="">All</option>${['buy','sell','overseas','commercial','construction','investment','contact'].map(s=>`<option>${s}</option>`).join('')}</select></div></div><div id="el" class="card tw"></div><div id="ed"></div>`;
+ const run=async()=>{let q=sb.from('enquiries').select('id,reference,type,name,phone,status,created_at').order('created_at',{ascending:false}).limit(200);if($('#es').value)q=q.eq('status',$('#es').value);if($('#et').value)q=q.eq('type',$('#et').value);
+  const s=$('#eq').value.replace(/[%,()_]/g,' ').trim();if(s)q=q.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%,reference.ilike.%${s}%`);const{data,error}=await q;
+  $('#el').innerHTML=error?msg(error.message):(data||[]).length?`<table><tr><th>Reference</th><th>Type</th><th>Name</th><th>Phone</th><th>Status</th><th>Received</th></tr>${data.map(x=>`<tr style="cursor:pointer" data-i="${x.id}"><td>${esc(x.reference)}</td><td>${esc(x.type)}</td><td>${esc(x.name)}</td><td>${esc(x.phone)}</td><td><span class="pill">${esc(x.status)}</span></td><td>${new Date(x.created_at).toLocaleString()}</td></tr>`).join('')}</table>`:'<p>No enquiries match.</p>'};
+ ['eq','es','et'].forEach(i=>$('#'+i).oninput=run);run();
+ $('#el').onclick=async e=>{const tr=e.target.closest('tr[data-i]');if(!tr)return;const{data:x}=await sb.from('enquiries').select('*').eq('id',tr.dataset.i).single();
+  $('#ed').innerHTML=`<div class="card"><h3>${esc(x.reference)} · ${esc(x.type)}</h3><p><b>${esc(x.name)}</b> · ${esc(x.phone)} · ${esc(x.email||'no email')} · ${esc(x.country||'')}</p><table>${Object.entries(x.details||{}).map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>
+  <div class="g" style="margin-top:12px"><div><label for="xs">Status</label><select id="xs">${ST.map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join('')}</select></div><div class="full"><label for="xn">Internal notes</label><textarea id="xn" rows="4">${esc(x.admin_notes)}</textarea></div></div>
+  <div class="row" style="margin-top:12px"><button class="b" id="xsv">Save</button><a class="b s" style="text-decoration:none;padding:10px 16px" target="_blank" rel="noopener" href="https://wa.me/${esc((x.phone||'').replace(/\D/g,''))}">WhatsApp</a><button class="b d" id="xdl">Delete</button></div><div id="xm"></div></div>`;
+  $('#ed').scrollIntoView();$('#xsv').onclick=async()=>{const r=await sb.from('enquiries').update({status:$('#xs').value,admin_notes:$('#xn').value}).eq('id',x.id);$('#xm').innerHTML=r.error?msg(r.error.message):msg('Saved.',1);run()};
+  $('#xdl').onclick=async()=>{if(confirm('Delete this enquiry permanently?')){await sb.from('enquiries').delete().eq('id',x.id);$('#ed').innerHTML='';run()}}}}
+async function locs(){await loadLoc();const M=$('#main');const path=l=>{const a=[];let c=l;while(c){a.unshift(c.name);c=LOC.find(x=>x.id==c.parent_id)}return a.join(' › ')};
+ M.innerHTML=`<h2>Locations</h2><div id="lm"></div><div class="card g"><div><label for="lt">Level</label><select id="lt">${['country',...LV].map(x=>`<option>${x}</option>`).join('')}</select></div><div><label for="lp">Parent</label><select id="lp"><option value="">None (top level)</option>${LOC.map(l=>`<option value="${l.id}">${esc(path(l))} (${l.type})</option>`).join('')}</select></div><div><label for="ln">Name</label><input id="ln"></div><div style="align-self:end"><button class="b" id="la">Add location</button></div></div>
+ <div class="card tw"><table>${LOC.map(l=>({l,p:path(l)})).sort((a,b)=>a.p.localeCompare(b.p)).map(({l,p})=>`<tr><td>${esc(p)}</td><td>${l.type}</td><td><button class="b d" data-d="${l.id}">Delete</button></td></tr>`).join('')}</table></div>`;
+ $('#la').onclick=async()=>{const n=$('#ln').value.trim();if(!n)return;const r=await sb.from('locations').insert({type:$('#lt').value,parent_id:$('#lp').value?Number($('#lp').value):null,name:n});if(r.error){$('#lm').innerHTML=msg(r.error.message);return}locs()};
+ M.querySelector('table').onclick=async e=>{const b=e.target.closest('button[data-d]');if(b&&confirm('Delete this location and everything beneath it?')){const r=await sb.from('locations').delete().eq('id',b.dataset.d);if(r.error)$('#lm').innerHTML=msg('Cannot delete: '+r.error.message);else locs()}}}
+</script></body></html>
